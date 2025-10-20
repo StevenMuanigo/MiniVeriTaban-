@@ -1,2 +1,175 @@
 # MiniVeriTaban-
-MiniDB (C++)  Kısa Açıklama:  MiniDB, CSV dosyası üzerinde temel veritabanı işlemleri yapabilen basit bir C++ uygulamasıdır. Kullanıcı komut satırından SELECT, INSERT, DELETE komutlarını girerek veriyle etkileşime geçebilir.
+MiniDB (C++)  Kısa Açıklama:  MiniDB, CSV dosyası üzerinde temel veritabanı işlemleri yapabilen basit bir C++ uygulamasıdır. Kullanıcı komut satırından SELECT, INSERT, DELETE komutlarını girerek veriyle etkileşime geçebilir
+
+Özellikler
+
+CSV dosyasını veri tabanı olarak kullanır
+
+Komutlar:
+
+SELECT columnName
+
+INSERT value1,value2,value3
+
+DELETE columnName=value
+
+Kolayca genişletilebilir yapı
+
+Hata kontrolü (dosya yoksa uyarı verir)
+
+KOD:
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <map>
+#include <string>
+
+class MiniDB {
+public:
+    MiniDB(const std::string &filename) : filename(filename) {}
+
+    void processCommands() {
+        std::string command;
+        std::cout << "Enter command: ";
+        while (std::getline(std::cin, command)) {
+            std::stringstream ss(command);
+            std::string action;
+            ss >> action;
+            if (action == "SELECT") {
+                std::string column;
+                std::getline(ss, column);
+                select(column);
+            } else if (action == "INSERT") {
+                std::string values;
+                std::getline(ss, values);
+                insert(values);
+            } else if (action == "DELETE") {
+                std::string condition;
+                std::getline(ss, condition);
+                deleteRecord(condition);
+            } else {
+                std::cout << "Unknown command.\n";
+            }
+            std::cout << "Enter command: ";
+        }
+    }
+
+private:
+    const std::string filename;
+
+    std::vector<std::string> splitLine(const std::string &line, char delimiter) {
+        std::stringstream ss(line);
+        std::string item;
+        std::vector<std::string> tokens;
+        while (std::getline(ss, item, delimiter)) {
+            tokens.push_back(item);
+        }
+        return tokens;
+    }
+
+    void select(const std::string &column) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Error opening file.\n";
+            return;
+        }
+
+        std::string line;
+        std::vector<std::string> headers;
+        if (file.good()) {
+            std::getline(file, line);
+            headers = splitLine(line, ',');
+        }
+
+        int columnIndex = -1;
+        for (size_t i = 0; i < headers.size(); ++i) {
+            if (headers[i] == column) {
+                columnIndex = i;
+                break;
+            }
+        }
+
+        if (columnIndex == -1) {
+            std::cout << "Column not found.\n";
+            return;
+        }
+
+        while (std::getline(file, line)) {
+            std::vector<std::string> values = splitLine(line, ',');
+            if (columnIndex < values.size()) {
+                std::cout << values[columnIndex] << std::endl;
+            }
+        }
+
+        file.close();
+    }
+
+    void insert(const std::string &values) {
+        std::ofstream file(filename, std::ios::app);
+        if (!file.is_open()) {
+            std::cerr << "Error opening file.\n";
+            return;
+        }
+
+        file << values << std::endl;
+        file.close();
+    }
+
+    void deleteRecord(const std::string &condition) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Error opening file.\n";
+            return;
+        }
+
+        std::string line;
+        std::vector<std::string> headers;
+        std::vector<std::string> newRows;
+
+        if (file.good()) {
+            std::getline(file, line);
+            newRows.push_back(line);
+            headers = splitLine(line, ',');
+        }
+
+        int columnIndex = -1;
+        std::string conditionColumn, conditionValue;
+        std::stringstream condStream(condition);
+        std::getline(condStream, conditionColumn, '=');
+        std::getline(condStream, conditionValue);
+
+        for (size_t i = 0; i < headers.size(); ++i) {
+            if (headers[i] == conditionColumn) {
+                columnIndex = i;
+                break;
+            }
+        }
+
+        if (columnIndex == -1) {
+            std::cout << "Column not found.\n";
+            return;
+        }
+
+        while (std::getline(file, line)) {
+            std::vector<std::string> values = splitLine(line, ',');
+            if (columnIndex < values.size() && values[columnIndex] != conditionValue) {
+                newRows.push_back(line);
+            }
+        }
+
+        file.close();
+
+        std::ofstream outFile(filename);
+        for (const auto &row : newRows) {
+            outFile << row << std::endl;
+        }
+        outFile.close();
+    }
+};
+
+int main() {
+    MiniDB db("database.csv");
+    db.processCommands();
+    return 0;
